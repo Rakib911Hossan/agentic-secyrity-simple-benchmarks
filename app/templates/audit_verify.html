@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Audit integrity — SecureGate{% endblock %}
+{% block content %}
+<h1>Audit log integrity check</h1>
+<p class="{{ 'ok' if ok else 'fail' }}">{{ 'VERIFIED' if ok else 'TAMPERED' }}: {{ message }}</p>
+<p><a href="{{ url_for('dashboard.index') }}">Back</a></p>
+{% endblock %}

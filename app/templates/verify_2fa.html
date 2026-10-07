@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Verify 2FA — SecureGate{% endblock %}
+{% block content %}
+<h1>Enter your 6-digit code</h1>
+<form method="post" action="{{ url_for('auth.verify_2fa') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>Code <input type="text" name="code" pattern="[0-9]{6}" required autofocus></label>
+  <button type="submit">Verify</button>
+</form>
+{% endblock %}

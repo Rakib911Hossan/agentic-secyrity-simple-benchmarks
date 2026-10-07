@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Login — SecureGate{% endblock %}
+{% block content %}
+<h1>Login</h1>
+<form method="post" action="{{ url_for('auth.login') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>Username <input type="text" name="username" required autofocus></label>
+  <label>Password <input type="password" name="password" required></label>
+  <button type="submit">Log in</button>
+</form>
+<p><a href="{{ url_for('auth.register') }}">Create an account</a> ·
+   <a href="{{ url_for('auth.forgot_password') }}">Forgot password?</a></p>
+{% endblock %}

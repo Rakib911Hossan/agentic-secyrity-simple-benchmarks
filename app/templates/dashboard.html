@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — SecureGate{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<p>Mode: <strong>{{ 'SECURE' if secure_mode else 'VULNERABLE (demo only)' }}</strong></p>
+
+{% if is_admin %}
+<section>
+  <h2>Admin search</h2>
+  <form method="get" action="{{ url_for('dashboard.search') }}">
+    <input type="text" name="q" placeholder="Search users by username or email">
+    <button type="submit">Search</button>
+  </form>
+
+  <h2>Tools</h2>
+  <ul>
+    <li><a href="{{ url_for('dashboard.verify_audit') }}">Verify audit log integrity</a></li>
+    <li>Run the validation suite: <code>python -m validation_suite.runner</code></li>
+  </ul>
+</section>
+{% endif %}
+
+<section>
+  <h2>Recent activity</h2>
+  <table>
+    <thead><tr><th>Event</th><th>Detail</th><th>IP</th><th>When</th></tr></thead>
+    <tbody>
+      {% for e in recent_events %}
+      <tr>
+        <td>{{ e.event }}</td>
+        <td>{{ e.detail }}</td>
+        <td>{{ e.ip }}</td>
+        <td>{{ e.created_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

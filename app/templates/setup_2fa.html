@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Set up 2FA — SecureGate{% endblock %}
+{% block content %}
+<h1>Set up two-factor authentication</h1>
+<p>Scan this QR code with an authenticator app (Google Authenticator, Authy, etc.):</p>
+<img src="data:image/png;base64,{{ qr_b64 }}" alt="TOTP QR code" width="200" height="200">
+<p>Or enter this secret manually: <code>{{ secret }}</code></p>
+<form method="post" action="{{ url_for('auth.setup_2fa') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>Enter the 6-digit code to confirm <input type="text" name="code" pattern="[0-9]{6}" required></label>
+  <button type="submit">Enable 2FA</button>
+</form>
+{% endblock %}

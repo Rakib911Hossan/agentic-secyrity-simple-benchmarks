@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Register — SecureGate{% endblock %}
+{% block content %}
+<h1>Create account</h1>
+<form method="post" action="{{ url_for('auth.register') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>Username <input type="text" name="username" required></label>
+  <label>Email <input type="email" name="email" required></label>
+  <label>Password <input type="password" name="password" required></label>
+  <p class="hint">Min 8 chars, with uppercase, lowercase, digit, and symbol.</p>
+  <button type="submit">Register</button>
+</form>
+<p><a href="{{ url_for('auth.login') }}">Back to login</a></p>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Search results — SecureGate{% endblock %}
+{% block content %}
+<h1>Search results</h1>
+{# Secure mode: Jinja auto-escapes this by default, which is what blocks
+   reflected XSS. Vulnerable mode intentionally opts out with |safe so the
+   validation suite's XSS check has something real to catch. #}
+<p>Query: {% if secure_mode %}{{ query }}{% else %}{{ query|safe }}{% endif %}</p>
+<table>
+  <thead><tr><th>Username</th><th>Email</th><th>Admin</th></tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr><td>{{ r.username }}</td><td>{{ r.email }}</td><td>{{ 'yes' if r.is_admin else 'no' }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><a href="{{ url_for('dashboard.index') }}">Back</a></p>
+{% endblock %}

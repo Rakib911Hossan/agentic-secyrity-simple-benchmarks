@@ -39,3 +39,9 @@ th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #334155; }
 .ok { color: var(--ok); }
 .fail { color: var(--danger); }
 code { background: #0f172a; padding: 0.1rem 0.4rem; border-radius: 4px; }
+.chart { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+.chart-row { display: grid; grid-template-columns: 160px 1fr 2.5rem; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+.chart-label { color: #94a3b8; }
+.chart-bar-track { background: #0f172a; border-radius: 4px; overflow: hidden; height: 0.9rem; }
+.chart-bar { background: var(--accent); height: 100%; border-radius: 4px; min-width: 2px; }
+.chart-value { text-align: right; color: var(--text); }

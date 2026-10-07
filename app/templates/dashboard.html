@@ -17,6 +17,19 @@
     <li><a href="{{ url_for('dashboard.verify_audit') }}">Verify audit log integrity</a></li>
     <li>Run the validation suite: <code>python -m validation_suite.runner</code></li>
   </ul>
+
+  <h2>Security activity (all time)</h2>
+  <div class="chart">
+    {% for event, count in event_counts.items() %}
+    <div class="chart-row">
+      <span class="chart-label">{{ event }}</span>
+      <div class="chart-bar-track">
+        <div class="chart-bar" style="width: {{ (count / max_count * 100) | round(1) }}%"></div>
+      </div>
+      <span class="chart-value">{{ count }}</span>
+    </div>
+    {% endfor %}
+  </div>
 </section>
 {% endif %}
 

@@ -23,6 +23,7 @@ from app.security import (
     validate_password_strength, generate_csrf_token, csrf_protect,
     device_fingerprint, is_secure_mode,
 )
+from app.ratelimit import rate_limit
 from app.mailer import send_new_device_alert, send_password_reset
 from app.audit import log_event
 
@@ -84,6 +85,7 @@ def register():
 
 
 @bp.route("/login", methods=["GET", "POST"])
+@rate_limit(max_requests=15, window_seconds=60)
 @csrf_protect
 def login():
     if request.method == "GET":
@@ -246,6 +248,7 @@ def logout():
 
 
 @bp.route("/forgot-password", methods=["GET", "POST"])
+@rate_limit(max_requests=5, window_seconds=300)
 @csrf_protect
 def forgot_password():
     if request.method == "GET":

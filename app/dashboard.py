@@ -9,6 +9,12 @@ from app.audit import verify_chain
 bp = Blueprint("dashboard", __name__)
 
 
+TRACKED_EVENTS = [
+    "login_success", "login_failed", "login_blocked_lockout",
+    "new_device_login", "2fa_failed", "password_reset_requested",
+]
+
+
 @bp.route("/")
 @login_required()
 def index():
@@ -16,12 +22,25 @@ def index():
     recent_events = db.execute(
         "SELECT event, detail, ip, created_at FROM audit_log ORDER BY id DESC LIMIT 20"
     ).fetchall()
+
+    counts = {}
+    if session.get("is_admin"):
+        rows = db.execute(
+            "SELECT event, COUNT(*) AS n FROM audit_log GROUP BY event"
+        ).fetchall()
+        counts = {r["event"]: r["n"] for r in rows}
+        counts = {e: counts.get(e, 0) for e in TRACKED_EVENTS}
+
+    max_count = max(counts.values()) if counts and max(counts.values()) > 0 else 1
+
     return render_template(
         "dashboard.html",
         username=session.get("username"),
         is_admin=session.get("is_admin"),
         recent_events=recent_events,
         secure_mode=is_secure_mode(),
+        event_counts=counts,
+        max_count=max_count,
     )
 
 

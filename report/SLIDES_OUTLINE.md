@@ -9,7 +9,8 @@ Target: ~10-12 slides, 8-10 min talk + demo. One slide per bullet group below.
    requirement list (hashing, 2FA, lockout, SQLi/XSS/CSRF, etc.).
 
 3. **Architecture** — One diagram: Flask app (auth/dashboard/security/db/
-   mailer/audit) + the separate validation_suite that tests it over HTTP.
+   mailer/audit) + the separate validation_suite — five independent agents
+   coordinated by a thread-pool runner — that tests it over HTTP.
    Mention the stack (Flask, SQLite, bcrypt, pyotp, Fernet).
 
 4. **Feature walkthrough 1: Account security**
@@ -25,9 +26,12 @@ Target: ~10-12 slides, 8-10 min talk + demo. One slide per bullet group below.
    CSRF (per-session token), rate limiting. One code snippet per defense
    (keep short, 3-5 lines).
 
-7. **The signature feature: validation suite**
-   — Explain the MODE=secure|vulnerable toggle idea and why you built it
-   (prove the defenses work, not just claim it).
+7. **The signature feature: a multi-agent validation suite**
+   — Explain the MODE=secure|vulnerable toggle and why you built it (prove
+   the defenses work, not just claim it). Then explain the 5 agents: each
+   owns one vulnerability class, runs its own recon → scan → exploit loop
+   with its own HTTP session, and all 5 run **concurrently** via a thread
+   pool — show the agent table (Sqli/Xss/Csrf/Lockout/Headers).
 
 8. **LIVE DEMO: vulnerable mode**
    — Run the suite against vulnerable mode on screen; show the FAIL report

@@ -178,7 +178,7 @@ def csrf_protect(view):
 **[SCREENSHOT 11: validation suite CSRF check — PASS in secure mode]**
 
 ### 3.10 Rate Limiting
-A per-IP sliding-window limiter caps login attempts (15/min) and
+A per-IP sliding-window limiter caps login attempts (30/min) and
 password-reset requests (5/5min), slowing automated brute-force/enumeration.
 
 ```python
@@ -219,16 +219,30 @@ logins, 2FA failures and reset requests, pulled from the audit log.
 
 ---
 
-## 4. The Validation Suite — Before/After Demonstration
+## 4. The Multi-Agent Validation Suite — Before/After Demonstration
 
 The standout feature of this project: a `MODE=secure|vulnerable` toggle and
-an independent test runner (`validation_suite/`) that proves each defense
+**five specialized agents**, each owning exactly one vulnerability class,
+coordinated by `validation_suite/runner.py`. This proves each defense
 actually works, rather than just asserting it in writing.
 
-**How it works:** the suite runs 5 automated checks against the app's own
-local server — SQL injection (error-based signal), reflected XSS, CSRF
-token enforcement, brute-force lockout, and security headers — and writes a
-pass/fail report to `report/validation_report.html`.
+**How it works:** each agent (`validation_suite/agents/*.py`) runs its own
+recon → scan → exploit → result loop — independent HTTP session, its own
+reasoning steps logged — against the app's own local server. The
+coordinator dispatches all five agents **concurrently** via a thread pool,
+so "multiple agents working" is literal: each one probes its target
+independently and reports back on its own timeline, not in a fixed
+sequence. Their verdicts are merged into one pass/fail report at
+`report/validation_report.html`, which also shows each agent's full
+recon/scan/exploit trace.
+
+| Agent | Vulnerability class |
+|---|---|
+| `SqliAgent` | SQL injection (error-based signal on an unescaped quote) |
+| `XssAgent` | Reflected XSS in the admin search field |
+| `CsrfAgent` | Forged POST without a valid CSRF token |
+| `LockoutAgent` | Brute-force lockout after 3 failed attempts |
+| `HeadersAgent` | Missing security response headers |
 
 **Secure mode result:**
 
@@ -239,7 +253,7 @@ pass/fail report to `report/validation_report.html`.
 [PASS] xss_reflected_search: Payload was HTML-escaped before being reflected.
 [PASS] lockout_after_3_attempts: Account correctly locked after 3 failed attempts.
 
-5/5 checks passed.
+5/5 agents reported PASS.
 ```
 
 **Vulnerable mode result** (same checks, against intentionally weakened
@@ -252,16 +266,18 @@ code paths in `app/auth.py` and `app/dashboard.py`):
 [FAIL] xss_reflected_search: Payload reflected unescaped — vulnerable to XSS!
 [FAIL] lockout_after_3_attempts: Correct password was accepted despite 3 prior failures — lockout not enforced!
 
-0/5 checks passed.
+0/5 agents reported PASS.
 ```
 
-**[SCREENSHOT 16: validation_report.html rendered in a browser, secure mode]**
+**[SCREENSHOT 16: validation_report.html rendered in a browser, secure mode —
+include the per-agent recon/scan/exploit step trace]**
 **[SCREENSHOT 17: validation_report.html rendered in a browser, vulnerable mode]**
 
 This demonstrates, with reproducible evidence rather than just a written
 claim, that each specific defense (parameterized queries, output escaping,
 CSRF tokens, lockout logic, security headers) is the thing actually
-stopping the corresponding attack.
+stopping the corresponding attack — and that it holds up even when five
+independent agents are probing it at the same time.
 
 ---
 

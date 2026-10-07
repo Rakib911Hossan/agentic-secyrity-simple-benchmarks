@@ -85,7 +85,7 @@ def register():
 
 
 @bp.route("/login", methods=["GET", "POST"])
-@rate_limit(max_requests=15, window_seconds=60)
+@rate_limit(max_requests=30, window_seconds=60)
 @csrf_protect
 def login():
     if request.method == "GET":

@@ -7,13 +7,14 @@ CSRF_RE = re.compile(r'name="csrf_token" value="([^"]+)"')
 
 
 class CheckResult:
-    def __init__(self, name: str, passed: bool, detail: str):
+    def __init__(self, name: str, passed: bool, detail: str, steps: list | None = None):
         self.name = name
         self.passed = passed
         self.detail = detail
+        self.steps = steps or []  # [{"stage": "recon"|"scan"|"exploit"|"result", "message": str}]
 
     def to_dict(self):
-        return {"name": self.name, "passed": self.passed, "detail": self.detail}
+        return {"name": self.name, "passed": self.passed, "detail": self.detail, "steps": self.steps}
 
 
 def require_localhost(base_url: str):

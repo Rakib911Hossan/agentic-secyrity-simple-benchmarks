@@ -11,7 +11,7 @@ def send_email(to_addr: str, subject: str, body: str):
     cfg = current_app.config
     host = cfg.get("SMTP_HOST")
     user = cfg.get("SMTP_USER")
-    password = cfg.get("SMTP_PASSWORD")
+    password = (cfg.get("SMTP_PASSWORD") or "").replace(" ", "")
 
     if not host or not user or not password:
         current_app.logger.info(

@@ -5,3 +5,4 @@ qrcode==7.4.2
 cryptography==43.0.1
 python-dotenv==1.0.1
 requests==2.32.3
+Pillow==10.4.0

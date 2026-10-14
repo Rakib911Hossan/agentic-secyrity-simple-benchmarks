@@ -3,7 +3,7 @@ and the secure/vulnerable mode switch used for the validation-suite demo."""
 import re
 import secrets
 from functools import wraps
-from flask import session, request, abort, current_app, g
+from flask import session, request, abort, current_app, g, redirect, url_for
 
 PASSWORD_RE = re.compile(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$"
@@ -67,6 +67,8 @@ def login_required(admin_only: bool = False):
         @wraps(view)
         def wrapped(*args, **kwargs):
             if "user_id" not in session:
+                if request.method == "GET" and request.accept_mimetypes.accept_html:
+                    return redirect(url_for("auth.login"))
                 abort(401, description="Login required.")
             if admin_only and not session.get("is_admin"):
                 abort(403, description="Admin access required.")

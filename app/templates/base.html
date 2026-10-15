@@ -11,12 +11,29 @@
   <a class="brand" href="{{ url_for('dashboard.index') }}">SecureGate</a>
   {% if session.get('user_id') %}
     <nav>
-      <span>Hi, {{ session.get('username') }}</span>
-      <a href="{{ url_for('auth.setup_2fa') }}">2FA Setup</a>
+      {% if nav_secure_mode is defined %}
+        <span class="mode-badge {{ 'mode-secure' if nav_secure_mode else 'mode-vuln' }}"
+              title="Current security mode">{{ 'SECURE' if nav_secure_mode else 'VULNERABLE' }}</span>
+        {% if nav_is_admin %}
+        <form class="mode-toggle" method="post" action="{{ url_for('dashboard.set_mode') }}">
+          <input type="hidden" name="csrf_token" value="{{ nav_csrf }}">
+          <input type="hidden" name="mode" value="{{ 'vulnerable' if nav_secure_mode else 'secure' }}">
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <button type="submit" title="Switch security mode">
+            {{ '→ Vulnerable' if nav_secure_mode else '→ Secure' }}
+          </button>
+        </form>
+        {% endif %}
+      {% endif %}
+      <span class="nav-user">Hi, {{ session.get('username') }}</span>
+      <a href="{{ url_for('auth.setup_2fa') }}">2FA</a>
       <a href="{{ url_for('auth.logout') }}">Logout</a>
     </nav>
   {% endif %}
 </header>
+{% if session.get('user_id') and nav_secure_mode is defined and not nav_secure_mode %}
+<div class="vuln-banner">⚠ VULNERABLE demo mode — defenses are intentionally disabled. For local demo only.</div>
+{% endif %}
 <main class="container">
   {% with messages = get_flashed_messages() %}
     {% if messages %}

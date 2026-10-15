@@ -100,6 +100,14 @@ def set_mode():
     db.commit()
     log_event("mode_changed", detail=new_mode, user_id=session.get("user_id"), ip=request.remote_addr)
     flash(f"Mode switched to {new_mode.upper()}.")
+    # Return to the page the toggle was clicked from (e.g. the Attacker view
+    # mid-demo), but only for safe same-site relative paths.
+    nxt = request.form.get("next") or request.referrer
+    if nxt:
+        from urllib.parse import urlparse
+        p = urlparse(nxt)
+        if not p.netloc and p.path.startswith("/"):
+            return redirect(p.path + (("?" + p.query) if p.query else ""))
     return redirect(url_for("dashboard.index"))
 
 
@@ -224,7 +232,7 @@ def attacker_view():
     for r in recent:
         d = dict(r)
         spec = ATTACKS.get(d.get("attack_id"))
-        d["title"] = spec["title"] if spec else (d.get("attack_id") or "run")
+        d["title"] = spec["title"] if spec else (d.get("attack_id") or "(earlier run)")
         recent_runs.append(d)
 
     return render_template(

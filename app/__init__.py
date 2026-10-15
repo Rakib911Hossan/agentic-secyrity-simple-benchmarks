@@ -50,6 +50,22 @@ def create_app():
 
     app.after_request(apply_security_headers)
 
+    @app.context_processor
+    def inject_mode():
+        """Makes the current security mode + a CSRF token available to every
+        template, so the top bar can show a mode badge and (for admins) a
+        one-click secure/vulnerable toggle on every page."""
+        from flask import session
+        from app.security import is_secure_mode, generate_csrf_token
+        try:
+            return {
+                "nav_secure_mode": is_secure_mode(),
+                "nav_csrf": generate_csrf_token(),
+                "nav_is_admin": bool(session.get("is_admin")),
+            }
+        except Exception:
+            return {}
+
     @app.route("/")
     def root():
         from flask import redirect, url_for, session

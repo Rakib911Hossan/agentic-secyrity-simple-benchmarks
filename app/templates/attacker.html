@@ -68,7 +68,10 @@
           {% else %}<span class="hint">{{ r.status }}</span>{% endif %}
         </td>
         <td class="hint">{{ r.started_at }}</td>
-        <td><a href="{{ url_for('dashboard.attacker_view', attack=r.attack_id, run_id=r.id) }}">view</a></td>
+        <td>
+          <a href="{{ url_for('dashboard.attacker_view', attack=r.attack_id, run_id=r.id) }}">view</a>
+          · <a href="{{ url_for('dashboard.report', run_id=r.id) }}">report</a>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

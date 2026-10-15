@@ -154,6 +154,29 @@ strong { color: var(--accent); text-shadow: var(--glow); }
 .agent-note { font-size: .78rem; color: var(--dim); margin: 0; padding-left: .8rem; }
 .agent-note.retry { color: var(--warn); }
 
+/* Pentest report */
+.report-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.report-head h1 { margin-bottom: .2rem; }
+.report-meta { width: 100%; margin: 1rem 0; }
+.report-meta th { width: 160px; color: var(--dim); }
+.report-evidence { padding-left: 1.4rem; }
+.report-evidence li { font-size: .82rem; margin-bottom: .3rem; }
+.ev-stage { display: inline-block; min-width: 4.5em; color: var(--accent); text-transform: uppercase; font-size: .68rem; letter-spacing: .06em; }
+.report-foot { margin-top: 2rem; border-top: 1px solid var(--line); padding-top: .6rem; }
+.sev { padding: .1rem .5rem; border: 1px solid; font-weight: 700; font-size: .75rem; letter-spacing: .06em; }
+.sev-critical { color: var(--danger); border-color: var(--danger); }
+.sev-high { color: #ff9f43; border-color: #ff9f43; }
+.sev-medium { color: var(--warn); border-color: var(--warn); }
+.sev-low { color: #9dff5b; border-color: #9dff5b; }
+.sev-info { color: var(--dim); border-color: var(--dim); }
+@media print {
+  .no-print, .topbar, .vuln-banner, .view-tabs { display: none !important; }
+  body { background: #fff; color: #000; text-shadow: none; }
+  body::before, body::after { display: none !important; }
+  .report-evidence li, .report-meta th { color: #333; }
+  .ev-stage { color: #006400; }
+}
+
 /* Security posture gauge */
 .posture { display: flex; gap: 1.5rem; align-items: flex-start; border: 1px solid var(--line);
   background: var(--panel); padding: 1.2rem; margin: 1.5rem 0; flex-wrap: wrap; }

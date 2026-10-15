@@ -382,3 +382,46 @@ def agent_status(run_id):
         "mode_label": run["mode_label"],
         "steps": [dict(s) for s in steps],
     })
+
+
+# Severity per attack class, for the generated report.
+ATTACK_SEVERITY = {
+    "sqli_login": "Critical",
+    "xss_search": "High",
+    "csrf_forged": "High",
+    "lockout_bruteforce": "Medium",
+    "headers_audit": "Low",
+}
+
+
+@bp.route("/admin/report/<run_id>")
+@login_required(admin_only=True)
+def report(run_id):
+    """A printable pentest report generated from a completed run —
+    finding, severity, status, full evidence transcript, and remediation."""
+    from validation_suite.attack_runner import ATTACKS
+    db = get_db()
+    run = db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,)).fetchone()
+    if run is None:
+        abort(404, description="Unknown run.")
+    steps = db.execute(
+        "SELECT stage, message, created_at FROM agent_steps WHERE run_id = ? ORDER BY id ASC",
+        (run_id,),
+    ).fetchall()
+    attack_id = run["attack_id"]
+    spec = ATTACKS.get(attack_id, {})
+    status = run["status"]
+    # "Open" if the attack succeeded and wasn't remediated; else "Mitigated".
+    breached = status in ("captured", "breached")
+    finding_state = "OPEN" if breached else ("MITIGATED" if status in ("defended", "remediated") else status.upper())
+    return render_template(
+        "report.html",
+        run=dict(run),
+        steps=steps,
+        attack_title=spec.get("title", attack_id or "Security test"),
+        blurb=spec.get("blurb", ""),
+        defense=spec.get("defense", ""),
+        severity=ATTACK_SEVERITY.get(attack_id, "Info"),
+        finding_state=finding_state,
+        breached=breached,
+    )

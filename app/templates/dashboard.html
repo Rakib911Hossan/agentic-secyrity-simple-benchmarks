@@ -5,6 +5,7 @@
 <h1>Dashboard</h1>
 <p>Mode: <strong>{{ 'SECURE' if secure_mode else 'VULNERABLE (demo only)' }}</strong></p>
 <p class="hint">Pick a perspective above: 🧑‍💻 the app as a user, 🗡️ attacks run live, 🛡️ every defense visualized.</p>
+{% if posture %}{% include "_posture.html" %}{% endif %}
 
 {% if is_admin %}
 <section>

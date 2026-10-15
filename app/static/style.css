@@ -154,6 +154,29 @@ strong { color: var(--accent); text-shadow: var(--glow); }
 .agent-note { font-size: .78rem; color: var(--dim); margin: 0; padding-left: .8rem; }
 .agent-note.retry { color: var(--warn); }
 
+/* Security posture gauge */
+.posture { display: flex; gap: 1.5rem; align-items: flex-start; border: 1px solid var(--line);
+  background: var(--panel); padding: 1.2rem; margin: 1.5rem 0; flex-wrap: wrap; }
+.posture-gauge { flex: none; width: 140px; text-align: center; border: 2px solid var(--accent);
+  padding: 1rem .5rem; box-shadow: var(--glow); }
+.posture-score { font-size: 3rem; font-weight: 700; line-height: 1; color: var(--accent); text-shadow: var(--glow); }
+.posture-grade { font-size: 1rem; letter-spacing: .1em; text-transform: uppercase; margin-top: .3rem; }
+.posture-max { font-size: .75rem; color: var(--dim); }
+.posture-gauge.grade-A { border-color: var(--ok); } .posture-gauge.grade-A .posture-score { color: var(--ok); }
+.posture-gauge.grade-B { border-color: #9dff5b; } .posture-gauge.grade-B .posture-score { color: #9dff5b; text-shadow: none; }
+.posture-gauge.grade-C { border-color: var(--warn); } .posture-gauge.grade-C .posture-score { color: var(--warn); text-shadow: none; }
+.posture-gauge.grade-D { border-color: #ff9f43; } .posture-gauge.grade-D .posture-score { color: #ff9f43; text-shadow: none; }
+.posture-gauge.grade-F { border-color: var(--danger); } .posture-gauge.grade-F .posture-score { color: var(--danger); text-shadow: 0 0 6px rgba(255,59,78,.5); }
+.posture-detail { flex: 1; min-width: 260px; }
+.posture-title { margin: 0 0 .3rem; }
+.posture-bar-track { height: .7rem; background: #000; border: 1px solid var(--line); margin: .6rem 0; }
+.posture-bar { height: 100%; background: var(--ok); transition: width .4s ease; }
+.posture-bar.grade-C { background: var(--warn); } .posture-bar.grade-D { background: #ff9f43; } .posture-bar.grade-F { background: var(--danger); }
+.posture-factors { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .2rem; }
+.posture-factors li { font-size: .8rem; }
+.posture-mark { display: inline-block; width: 1.2em; font-weight: 700; }
+.posture-weight { color: var(--dim); font-size: .72rem; }
+
 /* Perspective switcher (User / Attacker / Defender) */
 .view-tabs { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--line); }
 .view-tab {

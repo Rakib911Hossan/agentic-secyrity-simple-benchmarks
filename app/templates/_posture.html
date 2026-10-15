@@ -1,0 +1,21 @@
+{# Security posture gauge. Expects `posture` = compute_posture() result. #}
+<section class="posture">
+  <div class="posture-gauge grade-{{ posture.grade }}">
+    <div class="posture-score">{{ posture.score }}</div>
+    <div class="posture-grade">grade {{ posture.grade }}</div>
+    <div class="posture-max">/ 100</div>
+  </div>
+  <div class="posture-detail">
+    <h2 class="posture-title">Security posture</h2>
+    <p class="hint">Live score from the defenses currently active. It collapses in VULNERABLE mode — that gap is what the defenses are worth.</p>
+    <div class="posture-bar-track"><div class="posture-bar grade-{{ posture.grade }}" style="width: {{ posture.score }}%"></div></div>
+    <ul class="posture-factors">
+      {% for f in posture.factors %}
+      <li class="{{ 'ok' if f.ok else 'fail' }}">
+        <span class="posture-mark">{{ '✓' if f.ok else '✗' }}</span>
+        {{ f.name }} <span class="posture-weight">(+{{ f.weight }})</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>

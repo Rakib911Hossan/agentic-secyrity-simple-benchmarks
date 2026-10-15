@@ -19,6 +19,32 @@ TRACKED_EVENTS = [
 ]
 
 
+def compute_posture():
+    """A live 0–100 security-posture score built from which defenses are
+    actually active right now. Mode-gated defenses (SQLi/CSRF/headers/rate
+    limit/lockout) go dark in vulnerable mode, so the score visibly collapses
+    — a one-number demonstration of what the defenses are worth."""
+    secure = is_secure_mode()
+    db = get_db()
+    chain_ok, _ = verify_chain()
+    twofa = db.execute("SELECT COUNT(*) AS n FROM users WHERE totp_enabled = 1").fetchone()["n"]
+
+    factors = [
+        {"name": "Parameterized queries (SQLi defense)", "weight": 20, "ok": secure},
+        {"name": "CSRF token enforcement", "weight": 15, "ok": secure},
+        {"name": "Security headers (CSP, X-Frame-Options…)", "weight": 15, "ok": secure},
+        {"name": "Brute-force lockout", "weight": 10, "ok": secure},
+        {"name": "Per-IP rate limiting", "weight": 10, "ok": secure},
+        {"name": "bcrypt password hashing", "weight": 10, "ok": True},
+        {"name": "Tamper-evident audit log", "weight": 10, "ok": chain_ok},
+        {"name": "Two-factor auth in use", "weight": 10, "ok": twofa > 0},
+    ]
+    score = sum(f["weight"] for f in factors if f["ok"])
+    grade = ("A" if score >= 90 else "B" if score >= 80 else "C" if score >= 70
+             else "D" if score >= 60 else "F")
+    return {"score": score, "grade": grade, "factors": factors, "secure": secure}
+
+
 @bp.route("/")
 @login_required()
 def index():
@@ -40,6 +66,7 @@ def index():
     return render_template(
         "dashboard.html",
         view=None,
+        posture=compute_posture() if session.get("is_admin") else None,
         username=session.get("username"),
         is_admin=session.get("is_admin"),
         recent_events=recent_events,
@@ -196,6 +223,7 @@ def features():
     return render_template(
         "features.html",
         view="defender",
+        posture=compute_posture(),
         secure_mode=secure,
         bcrypt_sample=bcrypt_sample,
         bcrypt_cost=bcrypt_cost,

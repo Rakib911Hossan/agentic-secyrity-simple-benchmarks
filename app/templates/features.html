@@ -5,6 +5,7 @@
 <h1>Defender view</h1>
 <p>Mode: <strong class="{{ 'ok' if secure_mode else 'fail' }}">{{ 'SECURE' if secure_mode else 'VULNERABLE (demo only)' }}</strong>
    · live data from the running app. <a href="{{ url_for('dashboard.index') }}">Back to dashboard</a></p>
+{% if posture %}{% include "_posture.html" %}{% endif %}
 
 <div class="feature-grid">
 

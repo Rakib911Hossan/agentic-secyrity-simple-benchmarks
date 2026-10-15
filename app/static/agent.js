@@ -14,6 +14,9 @@
   const progressBar = document.getElementById("progress-bar");
   const maxSteps = parseInt(section.dataset.maxSteps || "0", 10) || 1;
   section.style.display = "block";
+  // Bring the live transcript into view — on a fresh run or when the user
+  // clicks "view" on a past run (which reloads the page at the top).
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
 
   let shown = 0;
   let currentCard = null;

@@ -169,15 +169,47 @@ TOOLS = [
 RETRYABLE_STATUSES = (429, 500, 502, 503, 504)
 
 
+# Project rule: api_keys.txt at the repo root is the canonical pool of
+# Gemini keys. The agent reads it and rotates through its keys on quota
+# limits (429). Override the location with GEMINI_API_KEYS_FILE if needed.
+DEFAULT_KEYS_FILE = Path(__file__).resolve().parent.parent / "api_keys.txt"
+
+
+def _read_keys_file(path: Path) -> list[str]:
+    """Reads keys from a file, one per line. Blank lines and `#` comments
+    are ignored; a `NAME=value` line contributes the value (so both bare
+    keys and `GEMINI_API_KEY=...` lines work). Never logs key contents."""
+    keys: list[str] = []
+    try:
+        for line in path.read_text().splitlines():
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            if "=" in s:
+                s = s.split("=", 1)[1].strip()
+            s = s.strip().strip('"').strip("'")
+            if s:
+                keys.append(s)
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    return keys
+
+
 def load_api_keys(primary: str | None = None) -> list[str]:
     """Collects every configured Gemini key so the agent can rotate off an
-    exhausted one. Accepts, in order:
-      - `primary` (an explicitly passed key), then
-      - GEMINI_API_KEY, then
-      - GEMINI_API_KEYS (comma-separated list), then
+    exhausted one. Sources, in order:
+      - api_keys.txt at the repo root (or GEMINI_API_KEYS_FILE) — the
+        project's canonical key pool, read on every run,
+      - `primary` (an explicitly passed key),
+      - GEMINI_API_KEY,
+      - GEMINI_API_KEYS (comma-separated list),
       - GEMINI_API_KEY_2, _3, ... (numbered extras).
     Duplicates and blanks are dropped, order preserved."""
     candidates: list[str] = []
+    keys_file = Path(os.environ.get("GEMINI_API_KEYS_FILE") or DEFAULT_KEYS_FILE)
+    candidates.extend(_read_keys_file(keys_file))
     if primary:
         candidates.append(primary)
     if os.environ.get("GEMINI_API_KEY"):

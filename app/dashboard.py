@@ -210,8 +210,8 @@ def attacker_view():
     """Attacker view: pick an attack from the menu and watch the agent run
     it live, with a writeup of how it works and how the app defends."""
     from validation_suite.attack_runner import ATTACKS
-    from validation_suite.llm_agent import MAX_STEPS
-    gemini_configured = bool(os.environ.get("GEMINI_API_KEY"))
+    from validation_suite.llm_agent import MAX_STEPS, load_api_keys
+    gemini_configured = bool(load_api_keys())
     selected = request.args.get("attack")
     return render_template(
         "attacker.html",
@@ -235,7 +235,7 @@ def agent_page():  # pragma: no cover
 @csrf_protect
 def agent_run():
     from validation_suite.attack_runner import ATTACKS, run_attack
-    from validation_suite.llm_agent import AgentStore, DEFAULT_MODEL
+    from validation_suite.llm_agent import AgentStore, DEFAULT_MODEL, load_api_keys
     import uuid
 
     attack_id = request.form.get("attack", "sqli_login")
@@ -245,8 +245,8 @@ def agent_run():
         return redirect(url_for("dashboard.attacker_view"))
 
     api_key = os.environ.get("GEMINI_API_KEY")
-    if spec["kind"] == "llm" and not api_key:
-        flash("GEMINI_API_KEY is not set — add it to .env and restart the server.")
+    if spec["kind"] == "llm" and not load_api_keys(api_key):
+        flash("No Gemini API key available — add keys to api_keys.txt or GEMINI_API_KEY in .env.")
         return redirect(url_for("dashboard.attacker_view", attack=attack_id))
 
     db_path = Path(current_app.instance_path) / "securegate.db"

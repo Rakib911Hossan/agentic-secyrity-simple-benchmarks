@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Defender view — SecureGate{% endblock %}
+{% block content %}
+{% include "_viewtabs.html" %}
+<h1>Defender view</h1>
+<p>Mode: <strong class="{{ 'ok' if secure_mode else 'fail' }}">{{ 'SECURE' if secure_mode else 'VULNERABLE (demo only)' }}</strong>
+   · live data from the running app. <a href="{{ url_for('dashboard.index') }}">Back to dashboard</a></p>
+
+<div class="feature-grid">
+
+  <article class="feature-card">
+    <div class="feature-head"><span class="feature-dot ok"></span><h2>Password hashing</h2></div>
+    <p>Passwords are stored as <strong>bcrypt</strong> hashes with a per-user salt, never plaintext.</p>
+    {% if bcrypt_sample %}
+    <p class="hint">Stored hash for <code>{{ bcrypt_sample.username }}</code> (cost factor <strong>{{ bcrypt_cost }}</strong>):</p>
+    <pre class="feature-code">{{ bcrypt_sample.password_hash }}</pre>
+    {% endif %}
+  </article>
+
+  <article class="feature-card">
+    <div class="feature-head"><span class="feature-dot {{ 'ok' if secure_mode else 'fail' }}"></span><h2>Brute-force lockout</h2></div>
+    <p>After <strong>{{ lockout_threshold }}</strong> failed logins an account locks for 5 minutes.
+       {% if not secure_mode %}<span class="fail">Disabled in vulnerable mode.</span>{% endif %}</p>
+    <table>
+      <thead><tr><th>User</th><th>Failed</th><th>State</th></tr></thead>
+      <tbody>
+      {% for u in lock_rows %}
+        <tr>
+          <td>{{ u.username }}</td>
+          <td>
+            <span class="meter"><span class="meter-fill" style="width: {{ (u.failed_attempts / lockout_threshold * 100) | round(0) }}%"></span></span>
+            {{ u.failed_attempts }}/{{ lockout_threshold }}
+          </td>
+          <td>{% if u.locked_until %}<span class="fail">LOCKED</span>{% else %}<span class="ok">ok</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </article>
+
+  <article class="feature-card">
+    <div class="feature-head"><span class="feature-dot ok"></span><h2>Two-factor auth (TOTP)</h2></div>
+    <p>Time-based one-time codes via an authenticator app; the secret is encrypted at rest with Fernet.</p>
+    <p class="hint"><strong>{{ twofa_count }}</strong> user(s) have 2FA enabled.
+       <a href="{{ url_for('auth.setup_2fa') }}">Set up 2FA &rarr;</a></p>
+  </article>
+
+  <article class="feature-card">
+    <div class="feature-head"><span class="feature-dot {{ 'ok' if secure_mode else 'fail' }}"></span><h2>CSRF protection</h2></div>
+    <p>Every state-changing POST carries a per-session token that is verified server-side.
+       {% if not secure_mode %}<span class="fail">Not enforced in vulnerable mode.</span>{% endif %}</p>
+    <p class="hint">This session's token:</p>
+    <pre class="feature-code">{{ csrf_token }}</pre>
+  </article>
+
+  <article class="feature-card">
+    <div class="feature-head"><span class="feature-dot {{ 'ok' if secure_mode else 'fail' }}"></span><h2>Rate limiting</h2></div>
+    <p>Login and reset endpoints are capped per client IP (sliding window).
+       {% if not secure_mode %}<span class="fail">Off in vulnerable mode.</span>{% endif %}</p>
+    <p class="hint">A burst past the budget returns <code>429 Too Many Requests</code>.</p>
+  </article>
+
+  <article class="feature-card feature-wide">
+    <div class="feature-head"><span class="feature-dot {{ 'ok' if chain_ok else 'fail' }}"></span><h2>Tamper-evident audit log</h2></div>
+    <p>Each entry hashes the previous one, so altering any past entry breaks the chain.
+       Integrity: <strong class="{{ 'ok' if chain_ok else 'fail' }}">{{ 'VERIFIED' if chain_ok else 'BROKEN' }}</strong> — {{ chain_msg }}
+       · <a href="{{ url_for('dashboard.verify_audit') }}">re-verify &rarr;</a></p>
+    <div class="chain">
+      {% for e in chain_rows %}
+      <div class="chain-link">
+        <span class="chain-event">{{ e.event }}</span>
+        <code class="chain-hash">{{ e.entry_hash[:16] }}…</code>
+      </div>
+      {% if not loop.last %}<span class="chain-arrow">&rarr;</span>{% endif %}
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="feature-card">
+    <div class="feature-head"><span class="feature-dot ok"></span><h2>Scripted validation suite</h2></div>
+    {% if suite %}
+    <p>Last run — mode <strong>{{ suite.mode_label }}</strong>:
+       <strong class="{{ 'ok' if suite.passed == suite.total else 'fail' }}">{{ suite.passed }}/{{ suite.total }} passed</strong></p>
+    <div class="tile-row">
+      {% for r in suite.results %}
+      <span class="tile {{ 'ok' if r.passed else 'fail' }}" title="{{ r.detail }}">{{ r.name.split('_')[0] }}</span>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="hint">No report yet. Run <code>python -m validation_suite.runner</code>.</p>
+    {% endif %}
+  </article>
+
+  <article class="feature-card feature-accent">
+    <div class="feature-head"><span class="feature-dot {{ 'ok' if last_run and last_run.status == 'captured' else '' }}"></span><h2>AI pentest agent</h2></div>
+    <p>A Gemini-driven agent that autonomously tries to break in and capture the admin flag.</p>
+    {% if last_run %}
+    <p class="hint">Last run ({{ last_run.mode_label }}):
+      <strong class="{{ 'ok' if last_run.status == 'captured' else 'fail' }}">{{ last_run.status | upper }}</strong></p>
+    {% endif %}
+    <p><a href="{{ url_for('dashboard.attacker_view') }}">Run it live &rarr;</a></p>
+  </article>
+
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Attacker view — SecureGate{% endblock %}
+{% block content %}
+{% include "_viewtabs.html" %}
+
+<h1>Attacker view</h1>
+<p>Mode: <strong class="{{ 'ok' if secure_mode else 'fail' }}">{{ 'SECURE' if secure_mode else 'VULNERABLE (demo only)' }}</strong>.
+   Pick an attack — the agent runs it live, step by step, against this app's own instance.</p>
+
+{% if not gemini_configured %}
+<p class="hint">Note: the SQL-injection attack needs <code>GEMINI_API_KEY</code> in <code>.env</code>. The other attacks run without it.</p>
+{% endif %}
+
+<div class="attack-menu">
+  {% for aid, a in attacks.items() %}
+  <article class="attack-card {{ 'selected' if selected == aid }}">
+    <h2>{{ a.title }}</h2>
+    <p class="hint">{{ a.blurb }}</p>
+    <form method="post" action="{{ url_for('dashboard.agent_run') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="attack" value="{{ aid }}">
+      <button type="submit" {{ 'disabled' if a.kind == 'llm' and not gemini_configured }}>
+        {{ 'Run live agent' if a.kind == 'llm' else 'Run attack' }}
+      </button>
+    </form>
+  </article>
+  {% endfor %}
+</div>
+
+{% if selected %}
+<section class="attack-detail">
+  <h2>{{ attacks[selected].title }}</h2>
+  <div class="writeup">
+    <p><strong>How the attack works:</strong> {{ attacks[selected].blurb }}</p>
+    <p><strong>How SecureGate defends (secure mode):</strong> {{ attacks[selected].defense }}</p>
+    <p class="hint">In VULNERABLE mode that defense is deliberately disabled so you can see the attack land; flip to SECURE (Defender view) and run it again to watch it fail.</p>
+  </div>
+</section>
+{% endif %}
+
+<section id="transcript-section" class="agent-run" style="display:none;" data-max-steps="{{ max_steps }}">
+  <h2>Live run</h2>
+  <div class="agent-progress">
+    <div class="agent-progress-track"><div id="progress-bar" class="agent-progress-bar"></div></div>
+    <span id="run-status" class="hint">Starting…</span>
+  </div>
+  <div class="stage-legend">
+    <span class="stage-pill stage-recon">recon</span>
+    <span class="stage-pill stage-scan">scan</span>
+    <span class="stage-pill stage-exploit">exploit</span>
+    <span class="stage-pill stage-escalate">escalate</span>
+    <span class="stage-pill stage-capture">capture</span>
+    <span class="stage-pill stage-giveup">giveup</span>
+  </div>
+  <div id="transcript" class="agent-timeline"></div>
+</section>
+
+<script src="{{ url_for('static', filename='agent.js') }}"></script>
+{% endblock %}

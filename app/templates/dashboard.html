@@ -1,11 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — SecureGate{% endblock %}
 {% block content %}
+{% include "_viewtabs.html" %}
 <h1>Dashboard</h1>
 <p>Mode: <strong>{{ 'SECURE' if secure_mode else 'VULNERABLE (demo only)' }}</strong></p>
+<p class="hint">Pick a perspective above: 🧑‍💻 the app as a user, 🗡️ attacks run live, 🛡️ every defense visualized.</p>
 
 {% if is_admin %}
 <section>
+  <h2>Security mode</h2>
+  <p>
+    Currently <strong class="{{ 'ok' if secure_mode else 'fail' }}">{{ 'SECURE' if secure_mode else 'VULNERABLE' }}</strong>.
+    In VULNERABLE mode, <code>/login</code> builds its SQL query by string
+    concatenation instead of a parameterized query (see
+    <code>app/auth.py</code>), so a crafted username can inject SQL — e.g. a
+    <code>UNION SELECT</code> that forges an admin session. Flipping back to
+    SECURE swaps in the parameterized query and closes the hole immediately,
+    no restart needed.
+  </p>
+  <form method="post" action="{{ url_for('dashboard.set_mode') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if secure_mode %}
+      <input type="hidden" name="mode" value="vulnerable">
+      <button type="submit">Switch to VULNERABLE (demo only)</button>
+    {% else %}
+      <input type="hidden" name="mode" value="secure">
+      <button type="submit">Fix it — switch to SECURE</button>
+    {% endif %}
+  </form>
+
   <h2>Admin search</h2>
   <form method="get" action="{{ url_for('dashboard.search') }}">
     <input type="text" name="q" placeholder="Search users by username or email">
@@ -14,8 +37,10 @@
 
   <h2>Tools</h2>
   <ul>
+    <li><a href="{{ url_for('dashboard.features') }}"><strong>Security features showcase</strong> — all defenses, live</a></li>
+    <li><a href="{{ url_for('dashboard.attacker_view') }}">AI pentest agent — watch it try to break in, live</a></li>
     <li><a href="{{ url_for('dashboard.verify_audit') }}">Verify audit log integrity</a></li>
-    <li>Run the validation suite: <code>python -m validation_suite.runner</code></li>
+    <li>Run the scripted validation suite: <code>python -m validation_suite.runner</code></li>
   </ul>
 
   <h2>Security activity (all time)</h2>

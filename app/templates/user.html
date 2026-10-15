@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}User view — SecureGate{% endblock %}
+{% block content %}
+{% include "_viewtabs.html" %}
+
+<h1>User view</h1>
+<p class="hint">The app as a normal signed-in user sees it — your account, sign-in security, and recent activity.</p>
+
+{% if me %}
+<section class="feature-grid">
+  <article class="feature-card">
+    <div class="feature-head"><span class="feature-dot ok"></span><h2>Your account</h2></div>
+    <p><strong>{{ me.username }}</strong>{% if me.is_admin %} · <span class="ok">admin</span>{% endif %}</p>
+    <p class="hint">{{ me.email }}<br>Member since {{ me.created_at }}</p>
+  </article>
+
+  <article class="feature-card">
+    <div class="feature-head"><span class="feature-dot {{ 'ok' if me.totp_enabled else '' }}"></span><h2>Two-factor auth</h2></div>
+    {% if me.totp_enabled %}
+    <p><span class="ok">Enabled</span> — your logins require a one-time code.</p>
+    {% else %}
+    <p>Not enabled yet. <a href="{{ url_for('auth.setup_2fa') }}">Turn on 2FA &rarr;</a> for stronger protection.</p>
+    {% endif %}
+  </article>
+
+  <article class="feature-card">
+    <div class="feature-head"><span class="feature-dot ok"></span><h2>Account actions</h2></div>
+    <ul>
+      <li><a href="{{ url_for('auth.setup_2fa') }}">Set up / manage 2FA</a></li>
+      <li><a href="{{ url_for('auth.forgot_password') }}">Reset password</a></li>
+      <li><a href="{{ url_for('auth.logout') }}">Log out</a></li>
+    </ul>
+  </article>
+</section>
+
+<section>
+  <h2>Your recent activity</h2>
+  <table>
+    <thead><tr><th>Event</th><th>Detail</th><th>IP</th><th>When</th></tr></thead>
+    <tbody>
+      {% for e in my_events %}
+      <tr><td>{{ e.event }}</td><td>{{ e.detail }}</td><td>{{ e.ip }}</td><td>{{ e.created_at }}</td></tr>
+      {% else %}
+      <tr><td colspan="4" class="hint">No activity recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

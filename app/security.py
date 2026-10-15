@@ -11,7 +11,16 @@ PASSWORD_RE = re.compile(
 
 
 def is_secure_mode() -> bool:
-    return current_app.config.get("MODE", "secure") == "secure"
+    """Secure/vulnerable mode. Checks for a live, admin-set override in the
+    database first (see dashboard.set_mode), falling back to the MODE env
+    var baked in at startup. The override lets an admin flip the app's
+    defenses from the dashboard with no restart, for the demo."""
+    if "mode_override" not in g:
+        from app.db import get_db  # local import: avoids a db<->security cycle
+        row = get_db().execute("SELECT value FROM app_state WHERE key = 'mode'").fetchone()
+        g.mode_override = row["value"] if row else None
+    mode = g.mode_override or current_app.config.get("MODE", "secure")
+    return mode == "secure"
 
 
 def validate_password_strength(password: str) -> tuple[bool, str]:

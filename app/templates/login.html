@@ -2,6 +2,9 @@
 {% block title %}Login — SecureGate{% endblock %}
 {% block content %}
 <h1>Login</h1>
+{% if db_error %}
+<pre class="fail" style="white-space:pre-wrap;border:1px solid var(--danger);padding:.6rem;">Database error: {{ db_error }}</pre>
+{% endif %}
 <form method="post" action="{{ url_for('auth.login') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <label>Username <input type="text" name="username" required autofocus></label>

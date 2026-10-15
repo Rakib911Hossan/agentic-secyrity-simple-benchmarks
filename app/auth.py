@@ -103,7 +103,17 @@ def login():
         # INTENTIONALLY VULNERABLE: string-concatenated query, demo-only,
         # used by the validation suite to prove SQLi is caught in secure mode.
         query = f"SELECT * FROM users WHERE username = '{username}'"
-        user = db.execute(query).fetchone()
+        try:
+            user = db.execute(query).fetchone()
+        except Exception as exc:
+            # INTENTIONALLY VULNERABLE (information disclosure): vulnerable
+            # mode leaks the raw DB error back to the client. This is a real,
+            # separate weakness — verbose error messages hand an attacker the
+            # exact query shape (e.g. "SELECTs ... do not have the same number
+            # of result columns"), which is how they tune a UNION injection.
+            # Secure mode returns a generic error and never reaches here.
+            return render_template("login.html", csrf_token=generate_csrf_token(),
+                                   db_error=str(exc)), 500
 
     if user is None:
         log_event("login_failed", detail=f"unknown user '{username}'", ip=request.remote_addr)

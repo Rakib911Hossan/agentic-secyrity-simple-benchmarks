@@ -1,0 +1,15 @@
+{# Shared perspective switcher. `view` is one of: user, attacker, defender.
+   Attacker/Defender are admin-only. #}
+<nav class="view-tabs">
+  <a class="view-tab {{ 'active' if view == 'user' }}" href="{{ url_for('dashboard.user_view') }}">
+    <span class="view-ico">🧑‍💻</span> User view
+  </a>
+  {% if session.get('is_admin') %}
+  <a class="view-tab view-tab-attacker {{ 'active' if view == 'attacker' }}" href="{{ url_for('dashboard.attacker_view') }}">
+    <span class="view-ico">🗡️</span> Attacker view
+  </a>
+  <a class="view-tab view-tab-defender {{ 'active' if view == 'defender' }}" href="{{ url_for('dashboard.features') }}">
+    <span class="view-ico">🛡️</span> Defender view
+  </a>
+  {% endif %}
+</nav>

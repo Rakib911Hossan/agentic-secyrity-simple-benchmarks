@@ -1,10 +1,14 @@
 """Admin dashboard: user list, search, audit log view, mode toggle, and the
 validation-suite trigger/report viewer."""
-from flask import Blueprint, request, render_template, session, current_app
+import os
+import threading
+from pathlib import Path
+
+from flask import Blueprint, request, render_template, session, current_app, redirect, url_for, flash, abort, jsonify
 
 from app.db import get_db
 from app.security import generate_csrf_token, csrf_protect, login_required, is_secure_mode
-from app.audit import verify_chain
+from app.audit import verify_chain, log_event
 
 bp = Blueprint("dashboard", __name__)
 
@@ -35,12 +39,14 @@ def index():
 
     return render_template(
         "dashboard.html",
+        view=None,
         username=session.get("username"),
         is_admin=session.get("is_admin"),
         recent_events=recent_events,
         secure_mode=is_secure_mode(),
         event_counts=counts,
         max_count=max_count,
+        csrf_token=generate_csrf_token(),
     )
 
 
@@ -74,3 +80,213 @@ def search():
 def verify_audit():
     ok, message = verify_chain()
     return render_template("audit_verify.html", ok=ok, message=message, csrf_token=generate_csrf_token())
+
+
+@bp.route("/admin/mode", methods=["POST"])
+@login_required(admin_only=True)
+@csrf_protect
+def set_mode():
+    """Lets an admin flip MODE=secure|vulnerable live from the dashboard —
+    the fix for the demo vulnerability is one click, no restart needed."""
+    new_mode = request.form.get("mode")
+    if new_mode not in ("secure", "vulnerable"):
+        abort(400, description="mode must be 'secure' or 'vulnerable'.")
+    db = get_db()
+    db.execute(
+        "INSERT INTO app_state (key, value) VALUES ('mode', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (new_mode,),
+    )
+    db.commit()
+    log_event("mode_changed", detail=new_mode, user_id=session.get("user_id"), ip=request.remote_addr)
+    flash(f"Mode switched to {new_mode.upper()}.")
+    return redirect(url_for("dashboard.index"))
+
+
+@bp.route("/admin/flag")
+@login_required(admin_only=True)
+def flag():
+    """Admin-only secret. Used as the capture-the-flag target for the LLM
+    pentest agent (validation_suite/llm_agent.py): reaching this page proves
+    the agent actually escalated to admin rather than just claiming to."""
+    db = get_db()
+    row = db.execute("SELECT value FROM secrets WHERE key = 'flag'").fetchone()
+    return render_template("flag.html", flag=row["value"], csrf_token=generate_csrf_token())
+
+
+@bp.route("/view/user")
+@login_required()
+def user_view():
+    """User view: the app as a normal signed-in user experiences it —
+    their session, 2FA status, recent account activity."""
+    db = get_db()
+    uid = session.get("user_id")
+    me = db.execute(
+        "SELECT username, email, is_admin, totp_enabled, created_at FROM users WHERE id = ?",
+        (uid,),
+    ).fetchone()
+    my_events = db.execute(
+        "SELECT event, detail, ip, created_at FROM audit_log WHERE user_id = ? ORDER BY id DESC LIMIT 10",
+        (uid,),
+    ).fetchall()
+    return render_template(
+        "user.html",
+        view="user",
+        secure_mode=is_secure_mode(),
+        me=me,
+        my_events=my_events,
+    )
+
+
+@bp.route("/view/defender")
+@bp.route("/admin/features")  # kept: old link target
+@login_required(admin_only=True)
+def features():
+    """Defender view: a visual showcase of every security feature, each with
+    live data pulled from the running app — one page to demo or screenshot."""
+    import json
+    from pathlib import Path
+
+    db = get_db()
+    secure = is_secure_mode()
+
+    # bcrypt: a real stored hash, with its cost factor
+    sample = db.execute(
+        "SELECT username, password_hash FROM users WHERE password_hash LIKE '$2%' ORDER BY id LIMIT 1"
+    ).fetchone()
+    bcrypt_sample = dict(sample) if sample else None
+    bcrypt_cost = None
+    if bcrypt_sample:
+        parts = bcrypt_sample["password_hash"].split("$")
+        bcrypt_cost = parts[2] if len(parts) > 3 else None
+
+    # lockout: per-user failed attempts / lock state
+    lock_rows = db.execute(
+        "SELECT username, failed_attempts, locked_until FROM users ORDER BY failed_attempts DESC LIMIT 5"
+    ).fetchall()
+
+    # 2FA: how many users have it, plus a live code for the first one (demo)
+    twofa_count = db.execute("SELECT COUNT(*) AS n FROM users WHERE totp_enabled = 1").fetchone()["n"]
+
+    # audit hash-chain: the latest entries + integrity status
+    chain_rows = db.execute(
+        "SELECT id, event, prev_hash, entry_hash FROM audit_log ORDER BY id DESC LIMIT 6"
+    ).fetchall()
+    chain_ok, chain_msg = verify_chain()
+
+    # scripted validation suite: last report, if any
+    suite = None
+    report_path = Path(current_app.root_path).parent / "report" / "validation_report.json"
+    try:
+        suite = json.loads(report_path.read_text())
+    except Exception:
+        suite = None
+
+    # AI agent: most recent run summary
+    last_run = db.execute("SELECT * FROM agent_runs ORDER BY started_at DESC LIMIT 1").fetchone()
+
+    return render_template(
+        "features.html",
+        view="defender",
+        secure_mode=secure,
+        bcrypt_sample=bcrypt_sample,
+        bcrypt_cost=bcrypt_cost,
+        lock_rows=lock_rows,
+        lockout_threshold=3,
+        twofa_count=twofa_count,
+        chain_rows=list(reversed(chain_rows)),
+        chain_ok=chain_ok,
+        chain_msg=chain_msg,
+        suite=suite,
+        last_run=dict(last_run) if last_run else None,
+        csrf_token=generate_csrf_token(),
+    )
+
+
+@bp.route("/view/attacker")
+@bp.route("/admin/agent")  # kept: old link target
+@login_required(admin_only=True)
+def attacker_view():
+    """Attacker view: pick an attack from the menu and watch the agent run
+    it live, with a writeup of how it works and how the app defends."""
+    from validation_suite.attack_runner import ATTACKS
+    from validation_suite.llm_agent import MAX_STEPS
+    gemini_configured = bool(os.environ.get("GEMINI_API_KEY"))
+    selected = request.args.get("attack")
+    return render_template(
+        "attacker.html",
+        view="attacker",
+        secure_mode=is_secure_mode(),
+        gemini_configured=gemini_configured,
+        attacks=ATTACKS,
+        selected=selected if selected in ATTACKS else None,
+        max_steps=MAX_STEPS,
+        csrf_token=generate_csrf_token(),
+    )
+
+
+# Back-compat alias so any old bookmarks to the endpoint name still resolve.
+def agent_page():  # pragma: no cover
+    return redirect(url_for("dashboard.attacker_view"))
+
+
+@bp.route("/admin/agent/run", methods=["POST"])
+@login_required(admin_only=True)
+@csrf_protect
+def agent_run():
+    from validation_suite.attack_runner import ATTACKS, run_attack
+    from validation_suite.llm_agent import AgentStore, DEFAULT_MODEL
+    import uuid
+
+    attack_id = request.form.get("attack", "sqli_login")
+    spec = ATTACKS.get(attack_id)
+    if spec is None:
+        flash("Unknown attack selected.")
+        return redirect(url_for("dashboard.attacker_view"))
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if spec["kind"] == "llm" and not api_key:
+        flash("GEMINI_API_KEY is not set — add it to .env and restart the server.")
+        return redirect(url_for("dashboard.attacker_view", attack=attack_id))
+
+    db_path = Path(current_app.instance_path) / "securegate.db"
+    store = AgentStore(db_path)
+    base_url = request.host_url.rstrip("/")
+    mode_label = "secure" if is_secure_mode() else "vulnerable"
+    model = os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
+
+    # Pre-create the run row synchronously so the redirect target always
+    # has a valid run_id to poll, even before the thread's first write.
+    run_id = str(uuid.uuid4())
+    store.create_run(run_id, mode_label)
+
+    def _worker():
+        try:
+            run_attack(attack_id, base_url, store, run_id, mode_label, api_key=api_key, model=model)
+        except Exception as exc:  # pragma: no cover - defensive
+            store.log(run_id, "giveup", f"Worker crashed: {exc!r}")
+            store.finish(run_id, "failed", str(exc))
+
+    threading.Thread(target=_worker, daemon=True).start()
+    log_event("agent_run_started", detail=f"{attack_id}/{mode_label}",
+              user_id=session.get("user_id"), ip=request.remote_addr)
+    return redirect(url_for("dashboard.attacker_view", attack=attack_id, run_id=run_id))
+
+
+@bp.route("/admin/agent/status/<run_id>")
+@login_required(admin_only=True)
+def agent_status(run_id):
+    db = get_db()
+    run = db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,)).fetchone()
+    if run is None:
+        return jsonify({"error": "unknown run"}), 404
+    steps = db.execute(
+        "SELECT stage, message, created_at FROM agent_steps WHERE run_id = ? ORDER BY id ASC",
+        (run_id,),
+    ).fetchall()
+    return jsonify({
+        "status": run["status"],
+        "outcome": run["outcome"],
+        "mode_label": run["mode_label"],
+        "steps": [dict(s) for s in steps],
+    })

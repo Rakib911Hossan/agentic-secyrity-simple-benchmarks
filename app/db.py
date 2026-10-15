@@ -1,6 +1,7 @@
 """Database helpers. All queries are parameterized — placeholders only,
 never string-concatenated SQL — this is the baseline SQL-injection defense
 used everywhere in this app."""
+import secrets as _secrets_mod
 import sqlite3
 from pathlib import Path
 from flask import g, current_app
@@ -45,6 +46,41 @@ CREATE TABLE IF NOT EXISTS audit_log (
     prev_hash TEXT NOT NULL,
     entry_hash TEXT NOT NULL
 );
+
+-- Admin-only secret used as the "flag" the LLM pentest agent tries to
+-- capture (validation_suite/llm_agent.py). It proves genuine privilege
+-- escalation happened, rather than the agent just claiming success.
+CREATE TABLE IF NOT EXISTS secrets (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- Lets an admin flip MODE=secure|vulnerable from the dashboard, live,
+-- without restarting the server. Overrides the MODE env var when set.
+CREATE TABLE IF NOT EXISTS app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- One row per AI pentest agent run, plus its step-by-step transcript, so
+-- the dashboard can show the agent's recon/scan/exploit/result reasoning
+-- as it happens (polled from the browser) and afterward.
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id TEXT PRIMARY KEY,
+    mode_label TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running',
+    outcome TEXT,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS agent_steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id),
+    stage TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -68,6 +104,10 @@ def init_db(app):
     with app.app_context():
         db = get_db()
         db.executescript(SCHEMA)
+        row = db.execute("SELECT value FROM secrets WHERE key = 'flag'").fetchone()
+        if row is None:
+            flag = f"SECUREGATE{{{_secrets_mod.token_hex(8)}}}"
+            db.execute("INSERT INTO secrets (key, value) VALUES ('flag', ?)", (flag,))
         db.commit()
 
 

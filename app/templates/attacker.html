@@ -19,14 +19,16 @@
   <article class="attack-card {{ 'selected' if selected == aid }}">
     <h2>{{ a.title }}</h2>
     <p class="hint">{{ a.blurb }}</p>
+    {% set is_llm = a.kind in ('llm', 'llm_injection') %}
     <div class="attack-actions">
       <form method="post" action="{{ url_for('dashboard.agent_run') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="attack" value="{{ aid }}">
-        <button type="submit" {{ 'disabled' if a.kind == 'llm' and not gemini_configured }}>
-          {{ 'Run live agent' if a.kind == 'llm' else 'Run attack' }}
+        <button type="submit" {{ 'disabled' if is_llm and not gemini_configured }}>
+          {{ 'Run live agent' if is_llm else 'Run attack' }}
         </button>
       </form>
+      {% if a.kind != 'llm_injection' %}
       <form method="post" action="{{ url_for('dashboard.agent_remediate') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="attack" value="{{ aid }}">
@@ -34,6 +36,7 @@
           Breach → Fix → Verify
         </button>
       </form>
+      {% endif %}
     </div>
   </article>
   {% endfor %}
@@ -64,6 +67,7 @@
           {% if r.status in ('captured', 'breached') %}<span class="fail">{{ r.status }}</span>
           {% elif r.status == 'defended' %}<span class="ok">defended</span>
           {% elif r.status == 'remediated' %}<span class="ok">remediated</span>
+          {% elif r.status == 'contained' %}<span class="ok">contained</span>
           {% elif r.status == 'running' %}<span class="hint">running…</span>
           {% else %}<span class="hint">{{ r.status }}</span>{% endif %}
         </td>

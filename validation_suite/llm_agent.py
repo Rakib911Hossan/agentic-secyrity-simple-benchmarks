@@ -367,14 +367,15 @@ class HttpTool:
 
 
 def run_llm_agent(base_url: str, mode_label: str, api_key: str, model: str, store: AgentStore,
-                   run_id: str | None = None) -> dict:
+                   run_id: str | None = None, goal_prompt: str | None = None) -> dict:
     """Runs one full agent session against base_url and returns a summary
     dict. Writes its transcript to `store` as it goes.
 
     If `run_id` is omitted, a new run row is created here (CLI usage). The
     dashboard instead creates the row itself before spawning the background
     thread, so the page has something to poll immediately, and passes that
-    id in."""
+    id in. `goal_prompt` overrides the opening user message (used by the
+    prompt-injection demo to steer the agent at a honeypot page)."""
     require_localhost(base_url)
     if run_id is None:
         run_id = str(uuid.uuid4())
@@ -391,7 +392,7 @@ def run_llm_agent(base_url: str, mode_label: str, api_key: str, model: str, stor
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         temperature=0.4,
     )
-    contents = [types.Content(role="user", parts=[types.Part(text=GOAL_PROMPT)])]
+    contents = [types.Content(role="user", parts=[types.Part(text=goal_prompt or GOAL_PROMPT)])]
 
     outcome = {"success": False, "flag": None, "detail": "Step budget exhausted without a result."}
 

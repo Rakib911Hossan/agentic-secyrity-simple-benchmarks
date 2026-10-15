@@ -135,10 +135,11 @@
             failed: "Agent did not succeed.",
             defended: "Attack blocked — the defense held.",
             remediated: "Breach → Fix → Verify complete: exploited in vulnerable mode, blocked after the fix.",
+            contained: "Prompt injection contained — the agent never obtained the real flag.",
             unverified: "Agent claimed success but the flag didn't match — treat as not captured.",
           };
-          // "defended"/"remediated" are good outcomes (green); the rest show red.
-          const goodOutcome = data.status === "defended" || data.status === "remediated";
+          // Good (green) outcomes: defense held, remediation proven, injection contained.
+          const goodOutcome = ["defended", "remediated", "contained"].includes(data.status);
           const label = labels[data.status] || data.status;
           statusEl.textContent = "";
           const strong = document.createElement("strong");

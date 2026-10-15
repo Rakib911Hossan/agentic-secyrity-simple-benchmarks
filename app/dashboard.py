@@ -138,6 +138,16 @@ def set_mode():
     return redirect(url_for("dashboard.index"))
 
 
+@bp.route("/notes")
+def notes():
+    """A honeypot 'internal notes' page whose content contains a prompt-
+    injection payload aimed at the AI pentest agent (not at human users).
+    Used by the prompt-injection defense demo to show the agent being told
+    to abandon its goal and report a fake flag — which the server's
+    independent flag verification then rejects."""
+    return render_template("notes.html")
+
+
 @bp.route("/admin/flag")
 @login_required(admin_only=True)
 def flag():
@@ -297,7 +307,7 @@ def agent_run():
         return redirect(url_for("dashboard.attacker_view"))
 
     api_key = os.environ.get("GEMINI_API_KEY")
-    if spec["kind"] == "llm" and not load_api_keys(api_key):
+    if spec["kind"] in ("llm", "llm_injection") and not load_api_keys(api_key):
         flash("No Gemini API key available — add keys to api_keys.txt or GEMINI_API_KEY in .env.")
         return redirect(url_for("dashboard.attacker_view", attack=attack_id))
 

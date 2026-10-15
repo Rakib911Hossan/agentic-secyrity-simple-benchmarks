@@ -8,3 +8,8 @@ instance/
 report/*.html
 report/*.json
 *.log
+
+# Local secrets / key files
+api_keys.txt
+*.key
+secrets.txt

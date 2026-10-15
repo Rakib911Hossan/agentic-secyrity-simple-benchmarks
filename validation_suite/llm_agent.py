@@ -169,26 +169,85 @@ TOOLS = [
 RETRYABLE_STATUSES = (429, 500, 502, 503, 504)
 
 
-def _generate_with_retry(client, model, contents, config, store, run_id, max_attempts=5):
-    """Gemini's hosted models occasionally return a transient 503 ("high
-    demand") or 429 (rate limit) that has nothing to do with the request
-    itself — a plain retry a few seconds later reliably succeeds. Without
-    this, a run that would otherwise have worked just crashes."""
-    delay = 3
-    last_exc = None
-    for attempt in range(1, max_attempts + 1):
-        try:
-            return client.models.generate_content(model=model, contents=contents, config=config)
-        except Exception as exc:
-            status = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-            retryable = status in RETRYABLE_STATUSES or "UNAVAILABLE" in str(exc) or "RESOURCE_EXHAUSTED" in str(exc)
-            last_exc = exc
-            if not retryable or attempt == max_attempts:
-                raise
-            store.log(run_id, "recon", f"(Gemini API transient error, retrying in {delay}s: {str(exc)[:150]})")
-            time.sleep(delay)
-            delay = min(delay * 2, 30)
-    raise last_exc
+def load_api_keys(primary: str | None = None) -> list[str]:
+    """Collects every configured Gemini key so the agent can rotate off an
+    exhausted one. Accepts, in order:
+      - `primary` (an explicitly passed key), then
+      - GEMINI_API_KEY, then
+      - GEMINI_API_KEYS (comma-separated list), then
+      - GEMINI_API_KEY_2, _3, ... (numbered extras).
+    Duplicates and blanks are dropped, order preserved."""
+    candidates: list[str] = []
+    if primary:
+        candidates.append(primary)
+    if os.environ.get("GEMINI_API_KEY"):
+        candidates.append(os.environ["GEMINI_API_KEY"])
+    for part in (os.environ.get("GEMINI_API_KEYS") or "").split(","):
+        if part.strip():
+            candidates.append(part.strip())
+    i = 2
+    while os.environ.get(f"GEMINI_API_KEY_{i}"):
+        candidates.append(os.environ[f"GEMINI_API_KEY_{i}"])
+        i += 1
+    seen, keys = set(), []
+    for k in candidates:
+        if k not in seen:
+            seen.add(k)
+            keys.append(k)
+    return keys
+
+
+def _is_quota_error(exc) -> bool:
+    return "RESOURCE_EXHAUSTED" in str(exc) or getattr(exc, "code", None) == 429
+
+
+class GeminiPool:
+    """Wraps one-or-more API keys. generate() retries transient errors with
+    backoff, and on a quota/rate-limit (429 RESOURCE_EXHAUSTED) it rotates to
+    the NEXT key before retrying — so adding more keys to .env directly
+    extends how long a run can go before stalling."""
+
+    def __init__(self, keys: list[str]):
+        if not keys:
+            raise ValueError("No Gemini API keys configured.")
+        self.keys = keys
+        self.idx = 0
+        self._client = genai.Client(api_key=keys[0])
+
+    def _rotate(self) -> bool:
+        if self.idx + 1 >= len(self.keys):
+            return False
+        self.idx += 1
+        self._client = genai.Client(api_key=self.keys[self.idx])
+        return True
+
+    def generate(self, model, contents, config, store, run_id, max_attempts=6):
+        delay = 3
+        last_exc = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return self._client.models.generate_content(model=model, contents=contents, config=config)
+            except Exception as exc:
+                last_exc = exc
+                status = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+                retryable = status in RETRYABLE_STATUSES or "UNAVAILABLE" in str(exc) or _is_quota_error(exc)
+                if not retryable or attempt == max_attempts:
+                    raise
+                # On quota exhaustion, try switching to another key first —
+                # backing off on an exhausted key often won't recover.
+                if _is_quota_error(exc) and self._rotate():
+                    store.log(run_id, "recon",
+                              f"(Quota hit on key #{self.idx}; switched to key #{self.idx + 1} of {len(self.keys)}.)")
+                    continue
+                store.log(run_id, "recon", f"(Gemini API transient error, retrying in {delay}s: {str(exc)[:150]})")
+                time.sleep(delay)
+                delay = min(delay * 2, 30)
+        raise last_exc
+
+
+def _generate_with_retry(pool, model, contents, config, store, run_id):
+    """Back-compat shim: delegates to a GeminiPool.generate."""
+    return pool.generate(model, contents, config, store, run_id)
 
 
 class AgentStore:
@@ -290,7 +349,10 @@ def run_llm_agent(base_url: str, mode_label: str, api_key: str, model: str, stor
         store.create_run(run_id, mode_label)
 
     http_tool = HttpTool(base_url)
-    client = genai.Client(api_key=api_key)
+    keys = load_api_keys(api_key)
+    pool = GeminiPool(keys)
+    if len(keys) > 1:
+        store.log(run_id, "recon", f"(Loaded {len(keys)} API keys; will rotate on quota limits.)")
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         tools=[types.Tool(function_declarations=TOOLS)],
@@ -303,7 +365,7 @@ def run_llm_agent(base_url: str, mode_label: str, api_key: str, model: str, stor
 
     try:
         for step in range(1, MAX_STEPS + 1):
-            resp = _generate_with_retry(client, model, contents, config, store, run_id)
+            resp = pool.generate(model, contents, config, store, run_id)
             if not resp.candidates:
                 store.log(run_id, "recon", "(Empty API response with no candidates; asking the model to continue.)")
                 contents.append(types.Content(role="user", parts=[types.Part(text="Continue by calling a tool.")]))

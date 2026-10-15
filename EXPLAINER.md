@@ -304,17 +304,90 @@ validation_suite/
 
 ---
 
-## 13. One-line answers for common questions
+## 13. Q&A — likely viva questions
 
-- *Why bcrypt not SHA-256?* bcrypt is deliberately slow and salted, built for
-  passwords; plain SHA is fast and crackable in bulk.
-- *Why parameterized queries?* they send user input as **data**, so it can
-  never be executed as SQL — the root fix for injection.
-- *How does 2FA work?* app and server share a secret; both compute the same
-  time-based code every 30 seconds (TOTP).
-- *What makes the audit log tamper-evident?* each entry hashes the previous
-  one, so any edit breaks the chain from that point on.
-- *Is the AI agent dangerous?* no — it's localhost-only, has no shell, a
-  capped budget, and its claims are verified against the real database.
-- *What is "agentic security"?* securing systems that use AI agents —
-  including defending the agent itself from attacks like prompt injection.
+### Motivation & scope
+- *Why this project?* Most student security projects only *claim* to be
+  secure. SecureGate **proves** it by attacking itself live and showing each
+  defense block the attack — and it adds a modern twist: an autonomous AI
+  attacker and defenses for the AI itself (agentic security).
+- *What problem does it solve?* It demonstrates, end-to-end, how a login
+  portal is hardened against the common web attacks (OWASP-style) and how an
+  AI agent can both test those defenses and be defended in turn.
+- *Who would use it?* As a learning/demo tool: students, instructors, and as a
+  template for secure-login patterns.
+- *What's the single most novel part?* The **AI pentest agent** plus the
+  **prompt-injection containment** demo — few projects show agentic security.
+- *What's in scope vs not?* In scope: the app's own local instance, a fixed
+  set of attacks. Out of scope: attacking any external/real system — the tools
+  are hard-locked to localhost.
+
+### What each thing does
+- *What does secure/vulnerable mode do?* Turns defenses on/off so you can show
+  the same attack failing then succeeding.
+- *What does the posture score measure?* The weighted sum of defenses active
+  right now (0–100, graded A–F).
+- *What does the AI agent actually do?* Given only the page list and one goal
+  (read the admin flag), it chooses its own HTTP requests to break in.
+- *What does "Breach → Fix → Verify" do?* Reproduces an attack, applies the
+  fix, and re-runs it to prove it's blocked — one click.
+- *What does the audit log do?* Records security events in a hash chain so
+  tampering is detectable.
+
+### Which choice & why
+- *Which language/framework, and why?* Python + Flask — lightweight, readable,
+  ideal for clearly showing the security logic.
+- *Which database, and why?* SQLite — zero-setup, file-based, perfect for a
+  self-contained demo.
+- *Which hashing, and why bcrypt not SHA-256/MD5?* bcrypt is deliberately slow
+  and salted, designed for passwords; plain SHA/MD5 are fast and crackable in
+  bulk.
+- *Which 2FA method, and why TOTP?* TOTP (authenticator app) is offline, free,
+  and standard — no SMS costs or SIM-swap risk.
+- *Which AI model, and why Gemini?* Google Gemini via a free API tier; the code
+  is model-agnostic and rotates across multiple keys on quota limits.
+- *Why localhost-only for the agent?* Safety — a pentest tool must never be
+  pointable at systems you don't own.
+
+### How it works (mechanisms)
+- *How does parameterized query stop SQLi?* Input is sent to the DB as **data**
+  bound to a placeholder (`?`), so it's never parsed as SQL.
+- *How does 2FA work?* App and server share a secret; both compute the same
+  time-based 6-digit code every 30 seconds (TOTP).
+- *How does CSRF protection work?* Every POST must include a secret per-session
+  token the attacker's site can't know; no token → 403.
+- *How does lockout work?* A per-account failed-attempt counter locks the
+  account for 5 minutes after 3 failures.
+- *How is the audit log tamper-evident?* Each entry = hash(previous hash +
+  this entry), so editing any past row breaks every hash after it.
+- *How does the agent's tool-use loop work?* Model picks a tool → code runs it
+  → result fed back → repeat (recon → exploit → capture) until it finds the
+  flag or runs out of its step budget.
+- *How is prompt injection contained?* Scoped tools (no direct secret access) +
+  server-side verification of any flag the agent reports.
+- *How does the live timeline update?* The browser polls a status endpoint that
+  returns the run's stored steps; new steps render as they arrive.
+
+### Tricky / "gotcha" questions
+- *Isn't shipping a vulnerable mode dangerous?* It's a localhost-only teaching
+  switch, clearly bannered, never how the app would really run.
+- *Could the AI agent be tricked into leaking real data?* No — even if a
+  malicious page hijacks its text, it can't reach the real secret, and its
+  claims are re-verified server-side (the prompt-injection demo proves this).
+- *What if the AI just lies about capturing the flag?* The server checks the
+  reported flag against the real database; an unverified flag is rejected.
+- *Is SQLite a weakness?* For this demo, no — the defenses (parameterized
+  queries etc.) are the point; the same patterns apply to any SQL database.
+- *What are the known limits?* Rate limiting is in-memory (single process);
+  vulnerable mode must stay local; the AI agent depends on API quota.
+- *What would you improve with more time?* Multi-process rate limiting (Redis),
+  passkeys/WebAuthn, and a defender AI agent that auto-patches.
+
+### One-liners to memorize
+- *bcrypt:* slow + salted = safe passwords.
+- *Parameterized queries:* input as data, never code.
+- *TOTP:* shared secret → same rotating code both sides.
+- *CSRF token:* proves the request came from our own form.
+- *Hash chain:* tamper one entry, break them all.
+- *Agentic security:* securing systems that *use* AI agents — and the agents
+  themselves.

@@ -38,6 +38,31 @@
 </section>
 {% endif %}
 
+{% if recent_runs %}
+<section class="run-history">
+  <h2>Run history</h2>
+  <table>
+    <thead><tr><th>Attack</th><th>Mode</th><th>Result</th><th>When</th><th></th></tr></thead>
+    <tbody>
+      {% for r in recent_runs %}
+      <tr class="{{ 'run-active' if r.id == active_run }}">
+        <td>{{ r.title }}</td>
+        <td>{{ r.mode_label }}</td>
+        <td>
+          {% if r.status in ('captured', 'breached') %}<span class="fail">{{ r.status }}</span>
+          {% elif r.status == 'defended' %}<span class="ok">defended</span>
+          {% elif r.status == 'running' %}<span class="hint">running…</span>
+          {% else %}<span class="hint">{{ r.status }}</span>{% endif %}
+        </td>
+        <td class="hint">{{ r.started_at }}</td>
+        <td><a href="{{ url_for('dashboard.attacker_view', attack=r.attack_id, run_id=r.id) }}">view</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
 <section id="transcript-section" class="agent-run" style="display:none;" data-max-steps="{{ max_steps }}">
   <h2>Live run</h2>
   <div class="agent-progress">

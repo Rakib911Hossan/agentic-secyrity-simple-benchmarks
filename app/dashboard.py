@@ -213,6 +213,20 @@ def attacker_view():
     from validation_suite.llm_agent import MAX_STEPS, load_api_keys
     gemini_configured = bool(load_api_keys())
     selected = request.args.get("attack")
+    active_run = request.args.get("run_id")
+
+    # Recent runs so the attack history survives navigating away and back.
+    recent = get_db().execute(
+        "SELECT id, mode_label, attack_id, status, started_at FROM agent_runs "
+        "ORDER BY started_at DESC LIMIT 15"
+    ).fetchall()
+    recent_runs = []
+    for r in recent:
+        d = dict(r)
+        spec = ATTACKS.get(d.get("attack_id"))
+        d["title"] = spec["title"] if spec else (d.get("attack_id") or "run")
+        recent_runs.append(d)
+
     return render_template(
         "attacker.html",
         view="attacker",
@@ -220,6 +234,8 @@ def attacker_view():
         gemini_configured=gemini_configured,
         attacks=ATTACKS,
         selected=selected if selected in ATTACKS else None,
+        active_run=active_run,
+        recent_runs=recent_runs,
         max_steps=MAX_STEPS,
         csrf_token=generate_csrf_token(),
     )
@@ -259,6 +275,9 @@ def agent_run():
     # has a valid run_id to poll, even before the thread's first write.
     run_id = str(uuid.uuid4())
     store.create_run(run_id, mode_label)
+    # Record which attack this run was, for the run-history list.
+    get_db().execute("UPDATE agent_runs SET attack_id = ? WHERE id = ?", (attack_id, run_id))
+    get_db().commit()
 
     def _worker():
         try:

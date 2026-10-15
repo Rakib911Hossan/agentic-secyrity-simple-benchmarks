@@ -163,6 +163,10 @@ strong { color: var(--accent); text-shadow: var(--glow); }
 .attack-detail { border: 1px solid var(--line); background: var(--panel); padding: 1rem 1.2rem; margin: 1rem 0; }
 .writeup p { font-size: .9rem; }
 
+.run-history { margin-top: 1.5rem; }
+.run-history tr.run-active { background: rgba(0,255,102,.08); }
+.run-history tr.run-active td:first-child { border-left: 3px solid var(--accent); }
+
 /* Security features showcase */
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
 .feature-card {

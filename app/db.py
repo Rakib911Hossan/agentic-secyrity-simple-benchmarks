@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS app_state (
 CREATE TABLE IF NOT EXISTS agent_runs (
     id TEXT PRIMARY KEY,
     mode_label TEXT NOT NULL,
+    attack_id TEXT,
     status TEXT NOT NULL DEFAULT 'running',
     outcome TEXT,
     started_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -104,6 +105,12 @@ def init_db(app):
     with app.app_context():
         db = get_db()
         db.executescript(SCHEMA)
+        # Lightweight migration: add agent_runs.attack_id to older databases
+        # created before the column existed (so run history can show which
+        # attack was launched).
+        cols = {r["name"] for r in db.execute("PRAGMA table_info(agent_runs)")}
+        if "attack_id" not in cols:
+            db.execute("ALTER TABLE agent_runs ADD COLUMN attack_id TEXT")
         row = db.execute("SELECT value FROM secrets WHERE key = 'flag'").fetchone()
         if row is None:
             flag = f"SECUREGATE{{{_secrets_mod.token_hex(8)}}}"

@@ -328,6 +328,43 @@ def agent_run():
     return redirect(url_for("dashboard.attacker_view", attack=attack_id, run_id=run_id))
 
 
+@bp.route("/admin/agent/remediate", methods=["POST"])
+@login_required(admin_only=True)
+@csrf_protect
+def agent_remediate():
+    """Breach -> fix -> verify: reproduce the attack in vulnerable mode, apply
+    the fix (secure mode), and re-run to prove it's blocked. Deterministic,
+    no LLM. Restores the original mode when done."""
+    from validation_suite.attack_runner import ATTACKS, run_remediation
+    from validation_suite.llm_agent import AgentStore
+    import uuid
+
+    attack_id = request.form.get("attack", "sqli_login")
+    if attack_id not in ATTACKS:
+        flash("Unknown attack selected.")
+        return redirect(url_for("dashboard.attacker_view"))
+
+    db_path = Path(current_app.instance_path) / "securegate.db"
+    store = AgentStore(db_path)
+    base_url = request.host_url.rstrip("/")
+    run_id = str(uuid.uuid4())
+    store.create_run(run_id, "remediation")
+    get_db().execute("UPDATE agent_runs SET attack_id = ? WHERE id = ?", (attack_id, run_id))
+    get_db().commit()
+
+    def _worker():
+        try:
+            run_remediation(attack_id, base_url, store, run_id, db_path)
+        except Exception as exc:  # pragma: no cover - defensive
+            store.log(run_id, "giveup", f"Worker crashed: {exc!r}")
+            store.finish(run_id, "failed", str(exc))
+
+    threading.Thread(target=_worker, daemon=True).start()
+    log_event("remediation_started", detail=attack_id,
+              user_id=session.get("user_id"), ip=request.remote_addr)
+    return redirect(url_for("dashboard.attacker_view", attack=attack_id, run_id=run_id))
+
+
 @bp.route("/admin/agent/status/<run_id>")
 @login_required(admin_only=True)
 def agent_status(run_id):

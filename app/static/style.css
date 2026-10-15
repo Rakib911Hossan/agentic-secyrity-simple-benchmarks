@@ -198,6 +198,10 @@ strong { color: var(--accent); text-shadow: var(--glow); }
 .attack-card h2::before { content: "⚔ "; color: #ff9f43; }
 .attack-card .hint { flex: 1; }
 .attack-card form { padding: 0; border: none; background: none; box-shadow: none; margin-top: .6rem; }
+.attack-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
+.attack-actions form { margin-top: 0; }
+.btn-secondary { background: transparent; color: var(--dim); border: 1px solid var(--line); }
+.btn-secondary:hover { color: var(--ok); border-color: var(--ok); background: transparent; box-shadow: none; text-shadow: none; }
 .attack-detail { border: 1px solid var(--line); background: var(--panel); padding: 1rem 1.2rem; margin: 1rem 0; }
 .writeup p { font-size: .9rem; }
 

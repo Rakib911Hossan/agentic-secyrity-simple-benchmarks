@@ -111,3 +111,100 @@ def run_attack(attack_id: str, base_url: str, store: AgentStore, run_id: str,
         store.finish(run_id, "defended", f"Defense held: {result.detail}")
     else:
         store.finish(run_id, "breached", f"Weakness found: {result.detail}")
+
+
+# --- Auto-remediation (breach -> fix -> verify) -----------------------------
+
+import sqlite3
+import time
+
+import bcrypt
+import requests
+
+from validation_suite.checks.common import extract_csrf
+
+
+def _set_mode(db_path: Path, mode: str):
+    with sqlite3.connect(db_path) as c:
+        c.execute(
+            "INSERT INTO app_state (key, value) VALUES ('mode', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (mode,),
+        )
+
+
+def _get_mode(db_path: Path) -> str | None:
+    with sqlite3.connect(db_path) as c:
+        row = c.execute("SELECT value FROM app_state WHERE key = 'mode'").fetchone()
+    return row[0] if row else None
+
+
+def _probe(attack_id: str, base_url: str) -> tuple[bool, str]:
+    """Deterministically tests whether `attack_id` succeeds against whatever
+    mode the app is currently in. Returns (breached, detail). No LLM — this
+    is a fast, repeatable probe used by the remediation demo."""
+    if attack_id == "sqli_login":
+        s = requests.Session()
+        pw = "probe_pass_123"
+        h = bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+        r = s.get(f"{base_url}/login", timeout=10)
+        token = extract_csrf(r.text)
+        uname = (f"' UNION SELECT 1,'probe','probe@x.com','{h}',1,NULL,0,0,NULL,"
+                 f"'2024-01-01' -- ")
+        s.post(f"{base_url}/login",
+               data={"csrf_token": token, "username": uname, "password": pw},
+               timeout=10, allow_redirects=True)
+        r = s.get(f"{base_url}/admin/flag", timeout=10)
+        breached = "SECUREGATE{" in r.text
+        return breached, ("UNION-forged admin login read the flag."
+                          if breached else "Injection treated as literal text; login failed.")
+
+    spec = ATTACKS.get(attack_id)
+    if spec and spec.get("scripted_factory"):
+        agent = spec["scripted_factory"]()
+        result = agent.run(base_url)
+        # passed == defense held == NOT breached
+        return (not result.passed), result.detail
+    return False, "No probe available for this attack."
+
+
+def run_remediation(attack_id: str, base_url: str, store: AgentStore, run_id: str, db_path: Path):
+    """Breach -> fix -> verify: probes the attack in VULNERABLE mode (expect a
+    breach), applies the fix by switching to SECURE, re-probes (expect it
+    blocked), and restores the original mode. Streams to the live timeline."""
+    spec = ATTACKS.get(attack_id)
+    title = spec["title"] if spec else attack_id
+    original = _get_mode(db_path) or "secure"
+    try:
+        store.log(run_id, "recon", f"Auto-remediation for: {title}")
+
+        store.log(run_id, "scan", "Step 1/3 — reproducing the attack in VULNERABLE mode (defense off).")
+        _set_mode(db_path, "vulnerable")
+        time.sleep(0.3)
+        breached_before, detail_before = _probe(attack_id, base_url)
+        store.log(run_id, "exploit",
+                  f"VULNERABLE: {'BREACHED — ' if breached_before else 'not breached — '}{detail_before}")
+
+        store.log(run_id, "escalate", "Step 2/3 — applying the fix: switching to SECURE mode.")
+        _set_mode(db_path, "secure")
+        time.sleep(0.3)
+
+        store.log(run_id, "capture", "Step 3/3 — re-running the same attack to verify the fix.")
+        breached_after, detail_after = _probe(attack_id, base_url)
+        store.log(run_id, "capture",
+                  f"SECURE: {'STILL BREACHED — ' if breached_after else 'blocked — '}{detail_after}")
+
+        if breached_before and not breached_after:
+            store.finish(run_id, "remediated",
+                         f"Verified: {title} succeeded in vulnerable mode and is BLOCKED after the fix.")
+        elif not breached_before:
+            store.finish(run_id, "defended",
+                         f"{title} was already blocked in vulnerable mode (unexpected for this demo).")
+        else:
+            store.finish(run_id, "breached",
+                         f"{title} still succeeds after the fix — needs investigation.")
+    except Exception as exc:
+        store.log(run_id, "giveup", f"Remediation crashed: {exc!r}")
+        store.finish(run_id, "failed", str(exc))
+    finally:
+        _set_mode(db_path, original)

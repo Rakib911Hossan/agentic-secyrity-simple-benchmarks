@@ -134,18 +134,18 @@
             breached: "Weakness found — the attack landed (defense was down).",
             failed: "Agent did not succeed.",
             defended: "Attack blocked — the defense held.",
+            remediated: "Breach → Fix → Verify complete: exploited in vulnerable mode, blocked after the fix.",
             unverified: "Agent claimed success but the flag didn't match — treat as not captured.",
           };
-          // "breached"/"captured" = attack succeeded (red, from a defender's
-          // view that's bad); "defended" = defense held (green).
-          const attackSucceeded = data.status === "captured" || data.status === "breached";
+          // "defended"/"remediated" are good outcomes (green); the rest show red.
+          const goodOutcome = data.status === "defended" || data.status === "remediated";
           const label = labels[data.status] || data.status;
           statusEl.textContent = "";
           const strong = document.createElement("strong");
-          strong.className = data.status === "defended" ? "ok" : "fail";
+          strong.className = goodOutcome ? "ok" : "fail";
           strong.textContent = label;
           statusEl.appendChild(strong);
-          progressBar.classList.add(data.status === "defended" ? "ok" : "fail");
+          progressBar.classList.add(goodOutcome ? "ok" : "fail");
         }
       })
       .catch(() => { setTimeout(poll, 2500); });
